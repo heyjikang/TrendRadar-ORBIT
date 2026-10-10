@@ -146,7 +146,7 @@ After communication, the author indicated no concerns about server pressure, but
 >
 > Use code **`PROXY90`** to get **10% off**.
 
-<!-- Sponsor banner: 1400 × 400 px (7:2), matching the Volcengine banner in 0285a83; displayed at 100% width. -->
+<!-- Sponsor banner: 1400 × 300 px (14:3), displayed at 100% width; references: 302.AI at 992 × 250 px and Volcengine at 1400 × 400 px. The new banner retains the 1400 px width with a reduced height. -->
 <a href="https://www.swiftproxy.net/?ref=sansan0"><img src="_image/banner-swiftproxy.webp" alt="Swiftproxy global residential proxies" width="100%"></a>
 
 [Interested in sponsoring? View sponsorship and partnership details](https://trendradar.sandev.cc/en/sponsors/)

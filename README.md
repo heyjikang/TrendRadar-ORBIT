@@ -194,7 +194,7 @@
 >
 > 使用优惠码 **`PROXY90`**，即可享受 **九折优惠**。
 
-<!-- 赞助商横幅尺寸：1400 × 400 px（7:2），沿用 0285a83 的火山引擎横幅规格，以 100% 宽度展示。 -->
+<!-- 赞助商横幅尺寸：1400 × 300 px（14:3），以 100% 宽度展示；参考 302.AI 的 992 × 250 px 与火山引擎的 1400 × 400 px，新版沿用 1400 px 宽度并缩短高度。 -->
 <a href="https://www.swiftproxy.net/?ref=sansan0"><img src="_image/banner-swiftproxy.webp" alt="Swiftproxy 全球住宅代理" width="100%"></a>
 
 [有意赞助？点击查看赞助与合作详情](https://trendradar.sandev.cc/zh/sponsors/)
