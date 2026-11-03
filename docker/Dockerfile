@@ -6,7 +6,19 @@ WORKDIR /app
 ARG TARGETARCH
 ENV SUPERCRONIC_VERSION=v0.2.39
 
+# 本机网络会拦截 http://deb.debian.org（apt 报 "Clearsigned file isn't valid / NOSPLIT"），
+# 故改用 HTTPS 国内镜像源
 RUN set -ex && \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i -e 's|http://deb.debian.org|https://mirrors.aliyun.com|g' \
+               -e 's|http://security.debian.org|https://mirrors.aliyun.com/debian-security|g' \
+               /etc/apt/sources.list.d/debian.sources; \
+    fi && \
+    if [ -f /etc/apt/sources.list ]; then \
+        sed -i -e 's|http://deb.debian.org|https://mirrors.aliyun.com|g' \
+               -e 's|http://security.debian.org|https://mirrors.aliyun.com/debian-security|g' \
+               /etc/apt/sources.list; \
+    fi && \
     apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
     case ${TARGETARCH} in \

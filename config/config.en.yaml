@@ -223,6 +223,10 @@ ai_filter:
 # Centrally manage which regions appear in the push message and in what order
 # ===============================================================
 display:
+  # ORBIT 3D intel cockpit: additionally writes output/html/orbit/{mode}.html (+ archive)
+  # The original current/daily reports and index.html entry are never overwritten
+  orbit_enabled: true
+
   # Region display order (top to bottom = top to bottom in the push)
   # To reorder: just cut and paste whole lines
   # A region shows only when: 1. it is in this list AND 2. its toggle below is true
@@ -387,7 +391,11 @@ ai:
                                     #    so almost any provider can be hooked up.
 
 
-  timeout: 120                      # Request timeout (seconds)
+  timeout: 900                      # Hard cap on TOTAL duration per AI call (seconds)
+                                    # The call is aborted once total elapsed exceeds this,
+                                    # so a held-open connection or slow trickle can't hang it.
+                                    # Overridable via env var AI_TIMEOUT.
+                                    # An idle read timeout of min(60, timeout) is also applied.
 
   temperature: 1.0                  # Sampling temperature (0.0-2.0)
                                     # Note: some models (e.g. gpt-5) may require exactly 1.0, or they error

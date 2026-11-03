@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090713" />
+  <title>TrendRadar — ORBIT 情报监控舱</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div id="app" class="console">
+    <header class="topbar">
+      <div class="brandmark" aria-label="TrendRadar">
+        <div class="logo-orbit" aria-hidden="true"><span></span><span></span></div>
+        <div class="brandtext"><strong>TREND<span>RADAR</span></strong><small>AI SIGNAL INTELLIGENCE <em>/ ORBIT 01</em></small></div>
+      </div>
+      <div class="topbar-center"><span class="status-ping"></span><span>情报巡航系统</span><b class="topbar-divider"></b><span id="snapshot-label">报告快照</span></div>
+      <div class="actions">
+        <button id="quality-button" class="top-btn" type="button" title="切换渲染质量">画质：高</button>
+        <button id="portrait-button" class="top-btn" type="button" aria-pressed="false">竖屏预览</button>
+        <button id="play-button" class="top-btn hot" type="button" aria-pressed="true"><span id="play-icon">Ⅱ</span><span id="play-text">暂停巡航</span></button>
+      </div>
+    </header>
+
+    <div class="dashboard">
+      <aside class="leftpane pane">
+        <div class="pane-heading"><span class="mini-line"></span> SYSTEM OVERVIEW <span class="heading-index">01 / 03</span></div>
+        <div class="hero-caption"><span class="mini-dot"></span> TRENDRADAR MONITOR</div>
+        <h1>全域热点<br /><span>感知系统</span><span class="heading-period">.</span></h1>
+        <p class="lead">让每一个信息热点，<br />拥有可视化的能量轨迹。</p>
+        <div class="kpi-block">
+          <div class="kpi-main"><span id="kpi-total">32</span><small>命中资讯 <b>/ MATCHED</b></small></div>
+          <div class="kpi-minirow">
+            <div><strong id="kpi-topics">11</strong><span>监控主题</span></div>
+            <div><strong id="kpi-rss">7</strong><span>RSS 命中</span></div>
+            <div><strong id="kpi-platforms">11/11</strong><span>热榜平台</span></div>
+          </div>
+        </div>
+        <div class="section-heading"><span>信号频谱</span><small>TOPIC SIGNALS</small></div>
+        <div id="topic-list" class="topic-list" role="listbox" aria-label="选择热点主题"></div>
+        <div class="memory-block" id="memory-block">
+          <div class="memory-head"><span>24H 热度记忆</span><small>ROLLING WINDOW</small></div>
+          <div class="memory-meta" id="memory-meta">读取累计记录…</div>
+          <div id="memory-list" class="memory-list" aria-label="24 小时累计热度主题"></div>
+        </div>
+        <div class="left-footer"><span class="live-dot"></span><span id="source-note">样例数据 · 非实时</span><span class="coords">ORBIT://V1</span></div>
+      </aside>
+
+      <main class="centerpane">
+        <div class="stage-top"><div><span class="tiny-chev">⌁</span> QUANTUM DATA FIELD <span class="upper-muted">· 3D PARTICLE ORBIT</span></div><span class="stage-index">VISUALIZATION 001</span></div>
+        <section class="orbit-stage" id="orbit-stage" aria-label="可实时运行的三维 WebGL 粒子情报球">
+          <div class="radial-halo halo-one" aria-hidden="true"></div>
+          <div class="radial-halo halo-two" aria-hidden="true"></div>
+          <div class="orb-grid" aria-hidden="true"></div>
+          <canvas id="particle-canvas" aria-label="WebGL 3D 粒子律动球"></canvas>
+          <div class="target target-1" aria-hidden="true"></div><div class="target target-2" aria-hidden="true"></div>
+          <div class="orbit-copy orbit-copy-left"><span class="narrow-label">SIGNAL FIELD</span><strong>42.77°</strong><small>多维信息映射</small></div>
+          <div class="orbit-copy orbit-copy-right"><span class="narrow-label">PARTICLE ENGINE</span><strong>WEBGL / GLSL</strong><small>程序化三维形变</small></div>
+          <svg id="orbit-leaders" class="orbit-leaders" aria-hidden="true"></svg>
+          <div id="orbit-markers" class="orbit-markers"></div>
+          <div class="core-label" aria-hidden="true">ANALYZING <span class="small-spinner"></span> DATA</div>
+          <div class="orbit-footer"><span><i class="small-led"></i> 3D WEBGL RENDER ACTIVE</span><span>TOUCH THE SIGNAL TO EXPLORE <b>↗</b></span></div>
+          <div id="webgl-error" class="webgl-error" hidden>当前浏览器未启用 WebGL2。请使用最新版 Chrome / Edge 并启用图形加速。</div>
+        </section>
+        <div class="bottom-panel">
+          <div class="stream-title"><span class="mini-line"></span> SIGNAL INDEX <small>主题索引</small></div>
+          <div id="topic-chips" class="topic-chips" aria-label="主题快捷切换"></div>
+        </div>
+      </main>
+
+      <aside class="rightpane pane">
+        <div class="pane-heading"><span class="mini-line"></span> INTELLIGENCE BRIEF <span class="heading-index">03 / 03</span></div>
+        <div class="brief-tabs" role="tablist" aria-label="情报视图切换">
+          <button class="brief-tab active" type="button" role="tab" data-view="topic" aria-selected="true">主题</button>
+          <button class="brief-tab" type="button" role="tab" data-view="rss" aria-selected="false">RSS <span class="tab-count" id="tab-count-rss">0</span></button>
+          <button class="brief-tab" type="button" role="tab" data-view="standalone" aria-selected="false">独立源 <span class="tab-count" id="tab-count-standalone">0</span></button>
+          <button class="brief-tab" type="button" role="tab" data-view="ai" aria-selected="false">AI 研判</button>
+        </div>
+
+        <div class="brief-view active" id="view-topic" role="tabpanel" aria-label="主题视图">
+          <div class="brief-header"><div class="brief-kicker"><span class="small-led"></span> SELECTED SIGNAL</div><span class="brief-number" id="topic-serial">07 / 11</span></div>
+          <div class="signal-identity"><div class="signal-orb" id="signal-orb"><div></div></div><span class="tag-burst" id="tag-burst">TOPIC IN FOCUS</span></div>
+          <div class="brief-title-wrap"><h2 id="brief-title">金融宏观</h2><div class="small-english" id="brief-subtitle">TREND INTELLIGENCE / SNAPSHOT</div></div>
+          <div class="score-grid"><div><small>命中数量</small><strong id="brief-count">08<span> ITEMS</span></strong></div><div><small>最佳上榜名次</small><strong id="brief-rank">—</strong></div></div>
+          <div class="analysis-block"><div class="section-heading brief-heading"><span id="brief-content-label">主题速览</span><small id="brief-kind">TITLE DIGEST</small></div><p id="brief-summary">依据真实样例新闻标题自动聚合展示。</p></div>
+          <div class="source-header">关联情报 <span>ORIGINAL SOURCES ↗</span></div>
+          <div id="news-list" class="news-list"></div>
+          <div class="brief-footnote" id="brief-footnote">来自报告快照。标题聚合不等于 AI 事实研判；点击可查看原始链接。</div>
+        </div>
+
+        <div class="brief-view" id="view-rss" role="tabpanel" aria-label="RSS 订阅更新" hidden>
+          <div class="view-heading">RSS 订阅更新 <span id="rss-summary">—</span></div>
+          <div class="view-subheading">命中关键词 <small>MATCHED FEEDS</small></div>
+          <div id="rss-list" class="news-list"></div>
+          <div class="view-subheading" id="rss-new-heading" hidden>本期新增 <small>NEW ENTRIES</small></div>
+          <div id="rss-new-list" class="news-list"></div>
+          <div class="view-footnote">RSS 条目为订阅源原文聚合，不代表 AI 研判。</div>
+        </div>
+
+        <div class="brief-view" id="view-standalone" role="tabpanel" aria-label="独立展示来源" hidden>
+          <div class="view-heading">独立展示源 <span id="standalone-summary">—</span></div>
+          <div id="standalone-list" class="news-list"></div>
+          <div class="view-footnote">独立展示区按配置的来源单独罗列，与热榜关键词命中相互独立。</div>
+        </div>
+
+        <div class="brief-view" id="view-ai" role="tabpanel" aria-label="全局 AI 研判" hidden>
+          <div class="view-heading">全局 AI 研判 <span id="ai-status">—</span></div>
+          <div class="view-note">这是整份报告的 AI 分析，不代表任一单主题的 AI 结论。</div>
+          <button class="ai-open" id="ai-open" type="button">全屏查看 AI 研判简报 ↗</button>
+          <div id="ai-preview" class="ai-preview"></div>
+          <div class="view-footnote">AI 内容仅供信息参考，请以原始来源为准。</div>
+        </div>
+      </aside>
+    </div>
+    <footer class="bottombar"><span class="footer-system"><span class="small-led"></span> SIGNAL ENGINE STABLE</span><span class="footer-hint">← → 切换主题 · 空格暂停/继续 · 点击热点查看来源</span><span>DESIGNED FOR INFORMATION OBSERVABILITY <b>© TRENDRADAR CONCEPT</b></span></footer>
+  </div>
+
+  <div class="ai-overlay" id="ai-overlay" hidden>
+    <div class="ai-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="ai-overlay-title">
+      <header class="ai-overlay-head">
+        <div>
+          <div class="ai-overlay-kicker">GLOBAL AI ANALYSIS · 非单主题研判</div>
+          <h2 id="ai-overlay-title">AI 研判简报</h2>
+        </div>
+        <button class="ai-close" id="ai-close" type="button" aria-label="关闭 AI 研判简报">✕</button>
+      </header>
+      <div class="ai-overlay-body" id="ai-overlay-body"></div>
+      <footer class="ai-overlay-foot" id="ai-overlay-foot"></footer>
+    </div>
+  </div>
+
+  <script src="demo-data.js"></script>
+  <script src="fallback-orbit.js"></script>
+  <script src="orbit.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

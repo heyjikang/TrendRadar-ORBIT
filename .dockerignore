@@ -28,6 +28,8 @@ _image/
 
 .github/
 
+reference/
+
 *.log
 .env.local
 .env.*.local

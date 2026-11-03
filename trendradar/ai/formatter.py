@@ -144,10 +144,26 @@ def render_ai_analysis_feishu(result: AIAnalysisResult) -> str:
     飞书卡片 markdown 基于 CommonMark，裸 ``[源名]:`` 会被解析为「链接引用定义」
     (link reference definition) 而整段不显示，故独立源点速览的源名改用 HTML 实体
     方括号 ``&#91;`` ``&#93;``（与 report/formatter.py 标题来源标签的处理一致）。
+
+    此外，若存在「AI 热点选题决策官」结论（topic_decision），会追加到卡片末尾。
+    该结论仅在飞书推送中展示，网页/HTML 报告不展示。
     """
-    return _render_ai_analysis_markdown_like(
+    base = _render_ai_analysis_markdown_like(
         result, standalone_brackets=("&#91;", "&#93;")
     )
+    if result.success and result.topic_decision:
+        topic_text = _render_topic_decision_feishu(result.topic_decision)
+        if topic_text:
+            base = f"{base}\n\n{topic_text}"
+    return base
+
+
+def _render_topic_decision_feishu(text: str) -> str:
+    """渲染「AI 热点选题决策官」结论为飞书卡片 markdown（仅飞书推送展示）"""
+    content = (text or "").strip()
+    if not content:
+        return ""
+    return "\n".join(["**🎯 AI 选题决策官**", "", content])
 
 
 def render_ai_analysis_dingtalk(result: AIAnalysisResult) -> str:

@@ -7,8 +7,10 @@ AI 客户端模块
 """
 
 import os
+import time
 from typing import Any, Dict, List
 
+import httpx
 from litellm import completion
 
 
@@ -67,13 +69,32 @@ class AIClient:
         Raises:
             Exception: API 调用失败时抛出异常
         """
+        # 整体硬上限：从发起请求到收完响应的【总时长】上限（秒）
+        hard_timeout = float(kwargs.get("timeout", self.timeout) or self.timeout)
+        # 读空闲超时：两次数据之间的最大间隔（秒）。
+        # 注意：openai 兼容接口的 timeout 落到 httpx 后只是「读超时」= 两次数据间隔，
+        # 只要连接被吊住或持续慢慢吐字，就永远不会触发。因此这里：
+        #   1) 用较小的 read 值做「空闲检测」——彻底卡死时能在该时间内中断；
+        #   2) 用下面的总时长循环判断 hard_timeout 兜底——持续慢吐字也能被掐断。
+        read_timeout = float(
+            kwargs.get("read_timeout", max(5, min(60, hard_timeout)))
+        )
+
         # 构建请求参数
         params = {
             "model": self.model,
             "messages": messages,
             "temperature": kwargs.get("temperature", self.temperature),
-            "timeout": kwargs.get("timeout", self.timeout),
+            # 显式传入 httpx.Timeout，避免把 300 当成「两次数据间隔」而永不触发
+            "timeout": httpx.Timeout(
+                connect=min(10.0, read_timeout),
+                read=read_timeout,
+                write=read_timeout,
+                pool=min(10.0, read_timeout),
+            ),
             "num_retries": kwargs.get("num_retries", self.num_retries),
+            # 强制流式：只有流式才能在本地循环里精确判断「总时长」并主动断开
+            "stream": True,
         }
 
         # 添加 API Key
@@ -97,21 +118,68 @@ class AIClient:
         # 再用调用方 kwargs 覆盖；两者均不覆盖上方已确定的核心参数，
         # 因此未配置 extra_params 时行为与原先完全一致
         for key, value in {**self.extra_params, **kwargs}.items():
-            if key not in params:
+            # read_timeout 是本方法内部消费的参数，不能透传给 LiteLLM
+            if key not in params and key != "read_timeout":
                 params[key] = value
 
-        # 调用 LiteLLM
-        response = completion(**params)
+        # 调用 LiteLLM（流式），并在循环中做总时长硬上限判断
+        start = time.monotonic()
+        parts: List[str] = []
+        stream = None
+        try:
+            stream = completion(**params)
+            for chunk in stream:
+                elapsed = time.monotonic() - start
+                if elapsed > hard_timeout:
+                    raise TimeoutError(
+                        f"AI 调用超过总时长上限 {hard_timeout:.0f}s"
+                        f"（已 {elapsed:.0f}s），已主动中断连接"
+                    )
+                text = self._extract_delta_text(chunk)
+                if text:
+                    parts.append(text)
+        finally:
+            # 无论正常结束还是超时中断，都显式关闭流，及时释放底层连接
+            if stream is not None:
+                close = getattr(stream, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
 
-        # 提取响应内容
-        # 某些模型/提供商返回 list（内容块）而非 str，统一转为 str
-        content = response.choices[0].message.content
-        if isinstance(content, list):
-            content = "\n".join(
-                item.get("text", str(item)) if isinstance(item, dict) else str(item)
-                for item in content
-            )
-        return content or ""
+        return "".join(parts)
+
+    @staticmethod
+    def _extract_delta_text(chunk: Any) -> str:
+        """从流式返回的 chunk 中提取增量文本
+
+        兼容三种形式：litellm 对象（chunk.choices[0].delta.content）、
+        字典（{"choices": [{"delta": {"content": ...}}]}），以及内容块 list。
+        """
+        try:
+            if isinstance(chunk, dict):
+                choices = chunk.get("choices") or []
+                if not choices:
+                    return ""
+                content = (choices[0].get("delta") or {}).get("content")
+            else:
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    return ""
+                delta = getattr(choices[0], "delta", None)
+                content = getattr(delta, "content", None) if delta is not None else None
+
+            if content is None:
+                return ""
+            if isinstance(content, list):
+                return "".join(
+                    item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                    for item in content
+                )
+            return content if isinstance(content, str) else str(content)
+        except (AttributeError, IndexError, TypeError):
+            return ""
 
     def validate_config(self) -> tuple[bool, str]:
         """

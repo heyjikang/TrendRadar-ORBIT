@@ -1,0 +1,29 @@
+# 临时参考代码目录（放入后仅供本地参考，用完请删除）
+/reference/
+
+# 环境变量与密钥（禁止提交）
+.env
+docker/.env
+.env.local
+run-trendradar.local.ps1
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 运行时产物 / 构建产物
+/output/
+/dist/
+/logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.idea/
+.vscode/

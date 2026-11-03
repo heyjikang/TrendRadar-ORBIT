@@ -121,6 +121,8 @@ class NewsAnalyzer:
 
     def _should_open_browser(self) -> bool:
         """判断是否应该打开浏览器"""
+        if os.environ.get("OPEN_REPORT_BROWSER", "").strip().lower() in ("false", "0"):
+            return False
         return not self.is_github_actions and not self.is_docker_container
 
     def _setup_proxy(self) -> None:
@@ -405,6 +407,23 @@ class NewsAnalyzer:
                 keywords=keywords,
                 standalone_data=ai_standalone,
             )
+
+            # 独立生成「AI 热点选题决策官」结论（仅追加到飞书推送卡片末尾，不在网页/HTML 展示）
+            if result.success and analysis_config.get("TOPIC_DECISION_ENABLED", True):
+                print("[AI] 正在生成选题决策结论...")
+                result.topic_decision = analyzer.analyze_topic_decision(
+                    stats=ai_stats,
+                    rss_stats=ai_rss_stats,
+                    report_mode=ai_mode,
+                    report_type=ai_report_type,
+                    platforms=platforms,
+                    keywords=keywords,
+                    standalone_data=ai_standalone,
+                )
+                if result.topic_decision:
+                    print("[AI] 选题决策结论生成完成")
+                else:
+                    print("[AI] 选题决策结论为空，跳过")
 
             # 设置 AI 分析使用的模式
             if result.success:

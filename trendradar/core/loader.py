@@ -233,6 +233,8 @@ def _load_display_config(config_data: Dict) -> Dict:
     return {
         # 区域显示顺序
         "REGION_ORDER": region_order,
+        # ORBIT 3D 情报舱：额外输出 output/html/orbit/，不影响原报告
+        "ORBIT_ENABLED": bool(display.get("orbit_enabled", False)),
         # 区域开关
         "REGIONS": {
             "HOTLIST": regions.get("hotlist", True),
@@ -289,6 +291,9 @@ def _load_ai_analysis_config(config_data: Dict) -> Dict:
         "INCLUDE_RSS": ai_config.get("include_rss", True),
         "INCLUDE_RANK_TIMELINE": ai_config.get("include_rank_timeline", False),
         "INCLUDE_STANDALONE": ai_config.get("include_standalone", False),
+        "TOPIC_DECISION_ENABLED": ai_config.get("topic_decision_enabled", True),
+        "TOPIC_PROMPT_FILE": ai_config.get("topic_prompt_file", "ai_topic_prompt.txt"),
+        "TOPIC_MAX_TOKENS": ai_config.get("topic_max_tokens", 16000),
     }
 
 

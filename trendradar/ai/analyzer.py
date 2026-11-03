@@ -24,6 +24,7 @@ class AIAnalysisResult:
     rss_insights: str = ""               # RSS 深度洞察
     outlook_strategy: str = ""           # 研判与策略建议
     standalone_summaries: Dict[str, str] = field(default_factory=dict)  # 独立展示区概括 {源ID: 概括}
+    topic_decision: str = ""             # 「AI 热点选题决策官」结论（纯文本，仅飞书推送追加展示）
 
     # 基础元数据
     raw_response: str = ""               # 原始响应
@@ -251,6 +252,71 @@ class AIAnalyzer:
                 success=False,
                 error=friendly_msg
             )
+
+    def analyze_topic_decision(
+        self,
+        stats: List[Dict],
+        rss_stats: Optional[List[Dict]] = None,
+        report_mode: str = "daily",
+        report_type: str = "当日汇总",
+        platforms: Optional[List[str]] = None,
+        keywords: Optional[List[str]] = None,
+        standalone_data: Optional[Dict] = None,
+    ) -> str:
+        """执行「AI 热点选题决策官」分析，返回纯文本结论
+
+        使用独立提示词（默认 ai_topic_prompt.txt），输出为纯文本 Markdown，
+        不参与 6 字段 JSON 解析。仅用于飞书推送追加展示，失败或无内容时返回空串，
+        不影响主分析流程。
+        """
+        try:
+            prompt_file = self.analysis_config.get(
+                "TOPIC_PROMPT_FILE", "ai_topic_prompt.txt"
+            )
+            system_prompt, user_template = load_prompt_template(prompt_file, label="AI选题")
+            if not user_template:
+                return ""
+
+            prepared = self._prepare_news_content(stats, rss_stats)
+            if not prepared.news_content and not prepared.rss_content:
+                return ""
+
+            current_time = self.get_time_func().strftime("%Y-%m-%d %H:%M:%S")
+            if not keywords:
+                keywords = [s.get("word", "") for s in stats if s.get("word")] if stats else []
+
+            standalone_content = ""
+            if self.include_standalone and standalone_data:
+                standalone_content, _ = self._prepare_standalone_content(standalone_data)
+
+            user_prompt = user_template
+            user_prompt = user_prompt.replace("{report_mode}", report_mode)
+            user_prompt = user_prompt.replace("{report_type}", report_type)
+            user_prompt = user_prompt.replace("{current_time}", current_time)
+            user_prompt = user_prompt.replace(
+                "{platforms}", ", ".join(platforms) if platforms else "多平台"
+            )
+            user_prompt = user_prompt.replace(
+                "{keywords}", ", ".join(keywords[:20]) if keywords else "无"
+            )
+            user_prompt = user_prompt.replace("{news_content}", prepared.news_content)
+            user_prompt = user_prompt.replace("{rss_content}", prepared.rss_content)
+            user_prompt = user_prompt.replace("{standalone_content}", standalone_content)
+
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
+
+            # 选题决策提示词会触发较长的推理过程（reasoning），若沿用全局
+            # max_tokens（默认 5000）会被推理耗尽，导致 finish_reason=length
+            # 且 content 为空。此处单独放宽 token 预算。
+            topic_max_tokens = self.analysis_config.get("TOPIC_MAX_TOKENS", 16000)
+            content = self.client.chat(messages, max_tokens=topic_max_tokens)
+            return (content or "").strip()
+        except Exception as e:
+            print(f"[AI选题] 生成失败: {type(e).__name__}: {e}")
+            return ""
 
     def _prepare_news_content(
         self,

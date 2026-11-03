@@ -10,7 +10,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
-
 def prepare_report_data(
     stats: List[Dict],
     failed_ids: Optional[List] = None,
@@ -154,6 +153,7 @@ def generate_html_report(
     render_html_func: Optional[Callable] = None,
     report_metadata: Optional[Dict] = None,
     translate_report_func: Optional[Callable] = None,
+    render_orbit_func: Optional[Callable] = None,
 ) -> str:
     """
     生成 HTML 报告
@@ -176,6 +176,7 @@ def generate_html_report(
         date_folder: 日期文件夹名称
         time_filename: 时间文件名
         render_html_func: HTML 渲染函数
+        render_orbit_func: ORBIT 3D 报告渲染函数（可选，独立输出，不影响原报告）
 
     Returns:
         str: 生成的 HTML 文件路径（时间戳快照路径）
@@ -242,5 +243,24 @@ def generate_html_report(
     root_index = Path("index.html")
     with open(root_index, "w", encoding="utf-8") as f:
         f.write(html_content)
+
+    # 4. ORBIT 3D 情报舱（可选）：独立目录输出，绝不覆盖上面的原报告与入口
+    if render_orbit_func:
+        try:
+            orbit_html = render_orbit_func(report_data, total_titles, mode, update_info)
+        except Exception as exc:  # ORBIT 失败不能影响原报告生成
+            print(f"[警告] ORBIT 报告生成失败，已跳过：{exc}")
+        else:
+            orbit_dir = Path(output_dir) / "html" / "orbit"
+            orbit_dir.mkdir(parents=True, exist_ok=True)
+            with open(orbit_dir / f"{mode}.html", "w", encoding="utf-8") as f:
+                f.write(orbit_html)
+
+            # 历史归档：output/html/orbit/archive/{日期}/{时间}.html
+            if date_folder and time_filename:
+                archive_dir = orbit_dir / "archive" / date_folder
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                with open(archive_dir / f"{time_filename}.html", "w", encoding="utf-8") as f:
+                    f.write(orbit_html)
 
     return snapshot_file

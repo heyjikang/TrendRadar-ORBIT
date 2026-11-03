@@ -1,8 +1,19 @@
 services:
   trendradar:
-    image: wantcat/trendradar:latest
+    # 本地构建（含 AI 筛选解析失败的稳定性修复），不再直接拉取官方镜像
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: trendradar:local
     container_name: trendradar
     restart: unless-stopped
+
+    # 容器 stdout 日志上限，避免日志无限增长占磁盘
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
     ports:
       - "127.0.0.1:${WEBSERVER_PORT:-8080}:${WEBSERVER_PORT:-8080}"
@@ -44,6 +55,7 @@ services:
       - AI_API_KEY=${AI_API_KEY:-}
       - AI_MODEL=${AI_MODEL:-}
       - AI_API_BASE=${AI_API_BASE:-}
+      - AI_TIMEOUT=${AI_TIMEOUT:-}
       # 远程存储配置（S3 兼容协议）
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}

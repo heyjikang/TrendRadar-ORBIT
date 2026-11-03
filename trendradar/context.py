@@ -130,6 +130,11 @@ class AppContext:
         return self.config.get("DISPLAY", {}).get("REGIONS", {}).get("NEW_ITEMS", True)
 
     @property
+    def orbit_enabled(self) -> bool:
+        """是否额外生成 ORBIT 3D 情报舱报告（独立目录，不影响原报告）"""
+        return bool(self.config.get("DISPLAY", {}).get("ORBIT_ENABLED", False))
+
+    @property
     def region_order(self) -> List[str]:
         """获取区域显示顺序"""
         default_order = ["hotlist", "rss", "new_items", "standalone", "ai_analysis"]
@@ -323,6 +328,34 @@ class AppContext:
         translate_report_func: Optional[Any] = None,
     ) -> str:
         """生成HTML报告"""
+        # ORBIT 3D 情报舱：开关开启时复用已翻译的 report_data 额外渲染一份独立报告
+        orbit_renderer = None
+        if self.orbit_enabled:
+            from trendradar.report.orbit import (
+                build_orbit_payload,
+                render_selfcontained_orbit_html,
+            )
+
+            orbit_assets = Path(__file__).resolve().parent / "report" / "orbit_assets"
+            # 24 小时热度记忆落盘位置：与 ORBIT 输出同目录，滚动覆盖，不随报告归档膨胀
+            orbit_history_file = (
+                Path("output") / "html" / "orbit" / "history" / "rolling.json"
+            )
+
+            def orbit_renderer(report_data, total_titles, mode, update_info):
+                payload = build_orbit_payload(
+                    report_data,
+                    mode=mode,
+                    total_titles=total_titles,
+                    generated_at=self.get_time(),
+                    rss_items=rss_items,
+                    rss_new_items=rss_new_items,
+                    standalone_data=standalone_data,
+                    ai_analysis=ai_analysis,
+                    history_file=orbit_history_file,
+                )
+                return render_selfcontained_orbit_html(payload, orbit_assets)
+
         return generate_html_report(
             stats=stats,
             total_titles=total_titles,
@@ -338,6 +371,7 @@ class AppContext:
             render_html_func=lambda *args, **kwargs: self.render_html(*args, rss_items=rss_items, rss_new_items=rss_new_items, ai_analysis=ai_analysis, standalone_data=standalone_data, **kwargs),
             report_metadata=report_metadata,
             translate_report_func=translate_report_func,
+            render_orbit_func=orbit_renderer,
         )
 
     def render_html(
