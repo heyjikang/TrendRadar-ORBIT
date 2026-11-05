@@ -6,3 +6,5 @@ $env:AI_MODEL           = ""
 $env:AI_API_BASE        = ""
 $env:AI_API_KEY         = ""
 $env:AI_TIMEOUT         = "900"
+# 推理模型关闭思考（避免思考耗尽 max_tokens 导致正文为空）
+$env:AI_ENABLE_THINKING = "false"

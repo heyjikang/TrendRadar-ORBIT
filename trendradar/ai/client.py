@@ -42,6 +42,9 @@ class AIClient:
         self.timeout = config.get("TIMEOUT", 120)
         self.num_retries = config.get("NUM_RETRIES", 2)
         self.fallback_models = config.get("FALLBACK_MODELS", [])
+        # 思考模式开关：None=不干预（默认），False=关闭思考，True=开启思考
+        # 仅部分模型支持（如 vLLM/Qwen 的 chat_template_kwargs.enable_thinking）
+        self.enable_thinking = config.get("ENABLE_THINKING")
         # config.yaml 中 ai.extra_params 的透传参数（如自定义请求头）
         self.extra_params = config.get("EXTRA_PARAMS") or {}
         if not isinstance(self.extra_params, dict):
@@ -79,6 +82,8 @@ class AIClient:
         read_timeout = float(
             kwargs.get("read_timeout", max(5, min(60, hard_timeout)))
         )
+        # 推理模型兜底：只有推理内容、正文为空时是否自动加大 token 重试一次
+        retry_on_empty = bool(kwargs.pop("retry_on_empty", True))
 
         # 构建请求参数
         params = {
@@ -122,12 +127,75 @@ class AIClient:
             if key not in params and key != "read_timeout":
                 params[key] = value
 
+        # 应用思考模式开关（在 extra_params 合并之后，保证用户自定义的
+        # extra_body 不被覆盖）
+        self._apply_thinking_switch(params)
+
         # 调用 LiteLLM（流式），并在循环中做总时长硬上限判断
+        content, reasoning_chars, finish_reason = self._stream_once(params, hard_timeout)
+
+        # 推理模型兜底：思考过程耗尽 max_tokens 时，正文可能完全为空。
+        # 此时把 token 预算翻倍重试一次（上限 16384），避免直接判失败。
+        if not content.strip() and reasoning_chars > 0:
+            base_max = int(params.get("max_tokens") or 0)
+            retry_max = min(base_max * 2, 16384)
+            if retry_on_empty and base_max and retry_max > base_max:
+                print(
+                    f"[AI] 仅收到推理内容（{reasoning_chars} 字符）且正文为空"
+                    f"（finish_reason={finish_reason or 'unknown'}），"
+                    f"将 max_tokens 从 {base_max} 提升至 {retry_max} 重试一次"
+                )
+                retry_params = dict(params)
+                retry_params["max_tokens"] = retry_max
+                content, reasoning_chars, finish_reason = self._stream_once(
+                    retry_params, hard_timeout
+                )
+
+        if not content.strip() and reasoning_chars > 0:
+            raise RuntimeError(
+                f"模型只输出了推理内容（{reasoning_chars} 字符）而正文为空"
+                f"（finish_reason={finish_reason or 'unknown'}），"
+                f"通常是思考过程耗尽了 max_tokens。请提高 ai.max_tokens，"
+                f"或关闭思考模式（config.yaml 设置 ai.enable_thinking: false，"
+                f"或环境变量 AI_ENABLE_THINKING=false）"
+            )
+
+        return content
+
+    def _apply_thinking_switch(self, params: Dict[str, Any]) -> None:
+        """按配置给请求追加思考模式开关（仅显式配置时生效）"""
+        if self.enable_thinking is None:
+            return
+        extra_body = dict(params.get("extra_body") or {})
+        template_kwargs = dict(extra_body.get("chat_template_kwargs") or {})
+        template_kwargs.setdefault("enable_thinking", bool(self.enable_thinking))
+        extra_body["chat_template_kwargs"] = template_kwargs
+        params["extra_body"] = extra_body
+
+    def _stream_once(
+        self, params: Dict[str, Any], hard_timeout: float
+    ) -> tuple[str, int, str]:
+        """执行一次流式调用
+
+        Returns:
+            (正文内容, 推理内容字符数, finish_reason)
+        """
         start = time.monotonic()
         parts: List[str] = []
+        reasoning_chars = 0
+        finish_reason = ""
         stream = None
         try:
             stream = completion(**params)
+            # 兼容非流式返回（部分代理或测试桩不返回可迭代对象）
+            if not hasattr(stream, "__iter__"):
+                choices = getattr(stream, "choices", None) or []
+                if not choices:
+                    return "", 0, ""
+                message = getattr(choices[0], "message", None)
+                content = getattr(message, "content", "") if message is not None else ""
+                reason = getattr(choices[0], "finish_reason", None) or ""
+                return content or "", 0, reason
             for chunk in stream:
                 elapsed = time.monotonic() - start
                 if elapsed > hard_timeout:
@@ -138,6 +206,10 @@ class AIClient:
                 text = self._extract_delta_text(chunk)
                 if text:
                     parts.append(text)
+                reasoning_chars += len(self._extract_delta_reasoning(chunk))
+                reason = self._extract_finish_reason(chunk)
+                if reason:
+                    finish_reason = reason
         finally:
             # 无论正常结束还是超时中断，都显式关闭流，及时释放底层连接
             if stream is not None:
@@ -148,36 +220,69 @@ class AIClient:
                     except Exception:
                         pass
 
-        return "".join(parts)
+        return "".join(parts), reasoning_chars, finish_reason
 
     @staticmethod
     def _extract_delta_text(chunk: Any) -> str:
-        """从流式返回的 chunk 中提取增量文本
+        """从流式返回的 chunk 中提取增量正文"""
+        return AIClient._extract_delta_field(chunk, ("content",))
 
-        兼容三种形式：litellm 对象（chunk.choices[0].delta.content）、
-        字典（{"choices": [{"delta": {"content": ...}}]}），以及内容块 list。
+    @staticmethod
+    def _extract_delta_reasoning(chunk: Any) -> str:
+        """从流式返回的 chunk 中提取增量推理内容（思考过程）"""
+        return AIClient._extract_delta_field(chunk, ("reasoning_content", "reasoning"))
+
+    @staticmethod
+    def _extract_finish_reason(chunk: Any) -> str:
+        """从流式返回的 chunk 中提取 finish_reason"""
+        try:
+            if isinstance(chunk, dict):
+                choices = chunk.get("choices") or []
+                if not choices:
+                    return ""
+                return choices[0].get("finish_reason") or ""
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                return ""
+            return getattr(choices[0], "finish_reason", None) or ""
+        except (AttributeError, IndexError, TypeError):
+            return ""
+
+    @staticmethod
+    def _extract_delta_field(chunk: Any, fields: tuple) -> str:
+        """从流式返回的 chunk 中提取指定字段的增量文本
+
+        兼容三种形式：litellm 对象（chunk.choices[0].delta.<field>）、
+        字典（{"choices": [{"delta": {"<field>": ...}}]}），以及内容块 list。
         """
         try:
             if isinstance(chunk, dict):
                 choices = chunk.get("choices") or []
                 if not choices:
                     return ""
-                content = (choices[0].get("delta") or {}).get("content")
+                delta = choices[0].get("delta") or {}
             else:
                 choices = getattr(chunk, "choices", None) or []
                 if not choices:
                     return ""
                 delta = getattr(choices[0], "delta", None)
-                content = getattr(delta, "content", None) if delta is not None else None
+                if delta is None:
+                    return ""
 
-            if content is None:
+            value = None
+            for name in fields:
+                value = delta.get(name) if isinstance(delta, dict) else getattr(delta, name, None)
+                if value:
+                    break
+
+            if value is None:
                 return ""
-            if isinstance(content, list):
+            if isinstance(value, list):
                 return "".join(
                     item.get("text", str(item)) if isinstance(item, dict) else str(item)
-                    for item in content
+                    for item in value
                 )
-            return content if isinstance(content, str) else str(content)
+            return value if isinstance(value, str) else str(value)
         except (AttributeError, IndexError, TypeError):
             return ""
 

@@ -50,12 +50,31 @@ class AIExtraParamsTests(unittest.TestCase):
             "fallbacks": ["test/backup"],
         }
 
+    @staticmethod
+    def normalize(params):
+        """统一断言口径：实现侧强制流式并把 timeout 转成 httpx.Timeout。
+
+        这里把 timeout 还原成「读秒数」、剔除 stream 后与 expected 比较，
+        其余参数原样保留，测试关注点仍是配置参数是否正确透传。
+        """
+        normalized = dict(params)
+        normalized.pop("stream", None)
+        timeout = normalized.get("timeout")
+        if timeout is not None and not isinstance(timeout, (int, float)):
+            read = getattr(timeout, "read", None)
+            if read is not None:
+                normalized["timeout"] = read
+        return normalized
+
     def chat_params(self, overrides=None, **kwargs):
         self.completion.reset_mock()
         client = AIClient({**self.config, **(overrides or {})})
         self.assertEqual(client.chat(self.messages, **kwargs), "mocked reply")
         self.completion.assert_called_once()
-        return self.completion.call_args.kwargs
+        params = self.completion.call_args.kwargs
+        # 流式调用是实现的既定行为，单独断言以免被 normalize 忽略掉
+        self.assertTrue(params.get("stream"))
+        return self.normalize(params)
 
     def test_missing_none_or_empty_extra_params_preserve_existing_request(self):
         for overrides in ({}, {"EXTRA_PARAMS": None}, {"EXTRA_PARAMS": {}}):

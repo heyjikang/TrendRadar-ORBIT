@@ -56,6 +56,7 @@ services:
       - AI_MODEL=${AI_MODEL:-}
       - AI_API_BASE=${AI_API_BASE:-}
       - AI_TIMEOUT=${AI_TIMEOUT:-}
+      - AI_ENABLE_THINKING=${AI_ENABLE_THINKING:-}
       # 远程存储配置（S3 兼容协议）
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}

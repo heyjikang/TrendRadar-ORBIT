@@ -273,6 +273,12 @@ def _load_ai_config(config_data: Dict) -> Dict:
         "NUM_RETRIES": ai_config.get("num_retries", 2),
         "FALLBACK_MODELS": ai_config.get("fallback_models", []),
         "EXTRA_PARAMS": ai_config.get("extra_params", {}),
+        # 思考模式开关（None=不干预）
+        "ENABLE_THINKING": (
+            _get_env_bool("AI_ENABLE_THINKING")
+            if _get_env_bool("AI_ENABLE_THINKING") is not None
+            else ai_config.get("enable_thinking")
+        ),
     }
 
 

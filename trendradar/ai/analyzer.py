@@ -625,7 +625,10 @@ class AIAnalyzer:
         result = AIAnalysisResult(raw_response=response)
 
         if not response or not response.strip():
-            result.error = "AI 返回空响应"
+            result.error = (
+                "AI 返回空响应（模型未输出正文，通常是思考过程耗尽了 max_tokens；"
+                "请提高 ai.max_tokens 或设置 ai.enable_thinking: false）"
+            )
             return result
 
         # 提取 JSON 文本（去掉 markdown 代码块标记）

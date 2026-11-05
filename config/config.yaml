@@ -399,6 +399,14 @@ ai:
   
   max_tokens: 5000                  # 最大生成 token 数
                                     # 注意：如果 API 不支持此参数(报 HTTP 400)，请设为 0 以禁用发送
+
+  # 思考模式开关（可选，默认不设置=不干预）
+  # 推理模型（Qwen3 / DeepSeek-R1 / vLLM 部署的思考模式模型）会先输出一大段
+  # reasoning，若耗尽了 max_tokens，正文就会为空，表现为「AI 返回空响应」。
+  # 设为 false 可关闭思考（更快、更省 token），仅部分模型/服务端支持该参数。
+  # 也可用环境变量 AI_ENABLE_THINKING=false 覆盖。
+  # enable_thinking: false
+
   # 高级选项
   num_retries: 1                    # 失败重试次数
   fallback_models: []               # 备用模型列表（可选）
