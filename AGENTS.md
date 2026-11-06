@@ -96,6 +96,28 @@ schtasks /Create /TN "TrendRadar-Daily" /TR "\"<仓库路径>\.venv\Scripts\pyth
 
 ---
 
+## 4.5 推送飞书：一句话接入
+
+用户说「帮我把推送接到飞书」时，**唯一需要人工的只有一步：去飞书群复制一次 Webhook 地址**。其余全部交给脚本。
+
+1. 告诉用户怎么拿：飞书群右上「···」→ 设置 → 群机器人 → 添加机器人 → **自定义机器人** → 复制 Webhook。
+   同时提醒：安全设置**不要勾「签名校验」**（本项目未实现飞书签名算法，勾了会发送失败），留空或选「自定义关键词」填 `热点`。
+2. 拿到地址后双击仓库根目录的 `setup-feishu.cmd`，粘贴回车即可。
+   助手代跑（非交互）：
+
+   ```bat
+   setup-feishu.cmd -Webhook "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx" -NoPause
+   ```
+
+   脚本会自动：校验地址格式 → 写入 `run-trendradar.local.ps1` + 两份 MCP 配置的 `env` + 用户环境变量 → 实发一条测试消息 → 报结果并给出失败原因。
+3. 提醒用户重启一次 WorkBuddy（MCP 进程只在启动时读环境变量），之后就能「发到飞书」。
+
+**为什么不写进 `config/config.yaml`**：本仓库是公开的，该文件被 git 跟踪，填进去再 push 等于公开 webhook。脚本刻意只写本地文件与用户环境变量，配置里那段保持空字符串。
+
+**泄露了会怎样**：webhook 只是一把「能往那个群发消息」的钥匙——不能读聊天记录、不能登录账号、不能访问云文档。止损方式：群里删掉该机器人，旧地址立即失效，重新添加换新的。
+
+---
+
 ## 5. 关于 AI Key
 
 **AI 功能默认关闭**：`config/config.yaml` 里 `filter.method: keyword`、`ai_analysis.enabled: false`、`ai_translation.enabled: false`。也就是说开箱即用走的全是关键词匹配，不调用任何大模型。
@@ -147,4 +169,7 @@ Windows 临时验证可在 PowerShell 里 `$env:AI_API_BASE="..."` 再运行；�
 | 安装时出现 `EADDRINUSE 127.0.0.1:607xx` | 正常现象：WorkBuddy 正在运行，占用了内置 CLI 的本地端口。脚本会自动改为直写 `~/.codebuddy/mcp.json`，看到「已直写」即注册成功；也可以先退出 WorkBuddy 再装 |
 | `install.cmd` 停在最后不退出 | 末尾在等回车。非交互执行（AI 自己跑）请加 `-NoPause` |
 | 想知道 MCP 装没装上 | `--doctor` 看第 9 项 `MCP注册`：`已注册: ~/.codebuddy/mcp.json` 即正常 |
+| 飞书发送失败、返回 `19021 sign match fail` | 机器人安全设置勾了「签名校验」，本项目不支持。改成「自定义关键词」填 `热点`，或留空 |
+| 飞书发送失败、提示关键词不匹配 | 同上，关键词填 `热点`（报告和测试消息里都有这两个字） |
+| 重启 WorkBuddy 后飞书仍发不出去 | 用户环境变量在 MCP 进程启动时才读取，需**完全退出** WorkBuddy 再开，不是关窗口 |
 | 端口 3333 被占用 | `python -m mcp_server.server --transport http --port 3334`，豆包 URL 同步改端口 |

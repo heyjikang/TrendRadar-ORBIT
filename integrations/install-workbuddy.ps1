@@ -97,11 +97,20 @@ function Write-McpConfig {
         $cfg | Add-Member -NotePropertyName disabledMcpServers -NotePropertyValue @() -Force
     }
 
+    # 保留 setup-feishu.ps1 等写入的额外环境变量（如 FEISHU_WEBHOOK_URL），重装时不要清掉
+    $envPairs = [ordered]@{ TZ = 'Asia/Shanghai'; PYTHONIOENCODING = 'utf-8' }
+    $prev = $cfg.mcpServers.trendradar
+    if ($prev -and ($prev.PSObject.Properties.Name -contains 'env') -and $prev.env) {
+        foreach ($p in $prev.env.PSObject.Properties) {
+            if (-not $envPairs.Contains($p.Name)) { $envPairs[$p.Name] = $p.Value }
+        }
+    }
+
     $entry = [pscustomobject][ordered]@{
         type    = 'stdio'
         command = $Py
         args    = @('-m', 'mcp_server.server', '--transport', 'stdio', '--project-root', $ProjectRoot)
-        env     = [pscustomobject][ordered]@{ TZ = 'Asia/Shanghai'; PYTHONIOENCODING = 'utf-8' }
+        env     = [pscustomobject]$envPairs
     }
 
     # 已有条目时只覆盖已知字段，保留客户端自己写入的其它字段（如 print）
