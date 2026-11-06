@@ -2,7 +2,8 @@
 # 用法：双击同目录的 install-workbuddy.cmd；或在 PowerShell 中执行本脚本
 param(
     [string]$ProjectRoot,
-    [string]$WorkBuddyHome
+    [string]$WorkBuddyHome,
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Continue'
@@ -71,12 +72,78 @@ if (-not $Node) { throw "没找到 node。请先启动一次 WorkBuddy，或安�
 Step "2/4" "WorkBuddy: $WbRoot"
 
 # ---------- 3. 注册 MCP 服务 ----------
-& $Node $Cli mcp remove trendradar --scope user 2>&1 | Out-Null
-& $Node $Cli mcp add trendradar --scope user -t stdio `
-    -e TZ=Asia/Shanghai -e PYTHONIOENCODING=utf-8 `
-    -- $Py -m mcp_server.server --transport stdio --project-root $ProjectRoot 2>&1 | Out-Null
+$McpJson = Join-Path $env:USERPROFILE '.codebuddy\mcp.json'
 
-if ($LASTEXITCODE -ne 0) { throw "MCP 注册失败 (exit $LASTEXITCODE)" }
+function Write-McpConfig {
+    $dir = Split-Path $McpJson -Parent
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+
+    $cfg = $null
+    if (Test-Path $McpJson) {
+        try { $cfg = Get-Content $McpJson -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $cfg = $null }
+    }
+    if (-not $cfg) { $cfg = [pscustomobject]@{} }
+    if (-not ($cfg.PSObject.Properties.Name -contains 'mcpServers') -or -not $cfg.mcpServers) {
+        $cfg | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([pscustomobject]@{}) -Force
+    }
+    if (-not ($cfg.PSObject.Properties.Name -contains 'disabledMcpServers')) {
+        $cfg | Add-Member -NotePropertyName disabledMcpServers -NotePropertyValue @() -Force
+    }
+
+    $entry = [pscustomobject][ordered]@{
+        type    = 'stdio'
+        command = $Py
+        args    = @('-m', 'mcp_server.server', '--transport', 'stdio', '--project-root', $ProjectRoot)
+        env     = [pscustomobject][ordered]@{ TZ = 'Asia/Shanghai'; PYTHONIOENCODING = 'utf-8' }
+    }
+
+    # 已有条目时只覆盖已知字段，保留客户端自己写入的其它字段（如 print）
+    if ($cfg.mcpServers.PSObject.Properties.Name -contains 'trendradar') {
+        $existing = $cfg.mcpServers.trendradar
+        foreach ($p in $entry.PSObject.Properties) {
+            $existing | Add-Member -NotePropertyName $p.Name -NotePropertyValue $p.Value -Force
+        }
+    } else {
+        $cfg.mcpServers | Add-Member -NotePropertyName trendradar -NotePropertyValue $entry -Force
+    }
+
+    $json = $cfg | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($McpJson, $json, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+# 先探测 CLI 是否可用（WorkBuddy 正在运行时 CLI 会因本地端口占用而失败）
+$probeOut = & $Node $Cli mcp list 2>&1
+$probeCode = $LASTEXITCODE
+$cliOk = ($probeCode -eq 0)
+
+if ($cliOk) {
+    & $Node $Cli mcp remove trendradar --scope user 2>&1 | Out-Null
+    $addOut = & $Node $Cli mcp add trendradar --scope user -t stdio `
+        -e TZ=Asia/Shanghai -e PYTHONIOENCODING=utf-8 `
+        -- $Py -m mcp_server.server --transport stdio --project-root $ProjectRoot 2>&1
+    $addCode = $LASTEXITCODE
+    if ($addCode -ne 0) {
+        $cliOk = $false
+        Warn "MCP CLI 注册失败 (exit $addCode)"
+        ($addOut | Out-String).Trim() -split "`r?`n" | ForEach-Object {
+            if ($_.Trim()) { Write-Host "      $($_.Trim())" -ForegroundColor DarkGray }
+        }
+    }
+} else {
+    Warn "WorkBuddy CLI 当前不可用 (exit $probeCode)，通常是 WorkBuddy 正在运行占用了本地端口。改用直接写入配置文件。"
+    ($probeOut | Out-String).Trim() -split "`r?`n" | ForEach-Object {
+        if ($_.Trim()) { Write-Host "      $($_.Trim())" -ForegroundColor DarkGray }
+    }
+}
+
+if (-not $cliOk) {
+    try {
+        Write-McpConfig
+        Warn "已直写 $McpJson（与 CLI 注册等效）"
+    } catch {
+        throw "MCP 注册失败：CLI 不可用，且写入 $McpJson 也失败：$_"
+    }
+}
 Step "3/4" "已注册 MCP 服务 trendradar"
 
 # ---------- 4. 安装技能 ----------
@@ -97,9 +164,34 @@ if (Test-Path $SkillSrc) {
 # ---------- 验证 ----------
 Write-Host ""
 Write-Host "健康检查:" -ForegroundColor Cyan
-& $Node $Cli mcp list
+if ($cliOk) {
+    & $Node $Cli mcp list
+} else {
+    Write-Host "  (CLI 不可用，跳过 mcp list；已直写配置，重启 WorkBuddy 后生效)" -ForegroundColor DarkGray
+}
+if (Test-Path $McpJson) {
+    try {
+        $check = Get-Content $McpJson -Raw -Encoding UTF8 | ConvertFrom-Json
+        $entry = $check.mcpServers.trendradar
+        if ($entry) {
+            $cmdOk = Test-Path $entry.command
+            $icon = if ($cmdOk) { "OK" } else { "命令不存在" }
+            Write-Host "  trendradar: $($entry.type) -> $($entry.command)  [$icon]" -ForegroundColor $(if ($cmdOk) { 'Green' } else { 'Red' })
+        } else {
+            Write-Host "  trendradar: 未在 $McpJson 中找到条目" -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "  $McpJson 解析失败: $_" -ForegroundColor Red
+    }
+}
 
 Write-Host ""
 Write-Host "安装完成。重启 WorkBuddy 后，直接对它说:" -ForegroundColor Green
 Write-Host '  「跑一下今天的热榜，整理成报告发我」' -ForegroundColor White
 Write-Host ""
+
+if (-not $NoPause) {
+    $interactive = $true
+    try { $interactive = -not [Console]::IsInputRedirected } catch { $interactive = $true }
+    if ($interactive) { Read-Host "按回车键退出" | Out-Null }
+}

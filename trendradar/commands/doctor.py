@@ -202,6 +202,41 @@ def _check_with_config(results: List[Tuple[str, str, str]], config: Dict) -> Non
     except Exception as e:
         _record_result(results, "fail", "输出目录", f"不可写: {e}")
 
+    # 9) MCP 注册检查（供 WorkBuddy / CodeBuddy 等客户端调用）
+    _check_mcp_registration(results)
+
+
+def _check_mcp_registration(results: List[Tuple[str, str, str]]) -> None:
+    candidates = [
+        Path.home() / ".codebuddy" / "mcp.json",
+        Path.home() / ".workbuddy" / "mcp.json",
+    ]
+    registered = []
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        entry = (data.get("mcpServers") or {}).get("trendradar")
+        if entry:
+            registered.append((path, entry))
+
+    if not registered:
+        _record_result(
+            results, "warn", "MCP注册",
+            "未找到 trendradar 条目（需要 AI 助手调用时执行 install.cmd）"
+        )
+        return
+
+    broken = [str(p) for p, e in registered if not Path(e.get("command", "")).exists()]
+    if broken:
+        _record_result(results, "fail", "MCP注册", f"配置中的 command 不存在: {', '.join(broken)}")
+    else:
+        paths = ", ".join(str(p) for p, _ in registered)
+        _record_result(results, "pass", "MCP注册", f"已注册: {paths}")
+
 
 def _check_notification_channels(results: List[Tuple[str, str, str]], config: Dict) -> None:
     channel_details = []

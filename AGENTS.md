@@ -26,10 +26,12 @@ install.cmd
 
 1. 没有 `.venv` 就用 `uv sync` 建环境（没装 uv 则 `python -m venv .venv` + `pip install -e .`）；
 2. 自动定位 WorkBuddy 安装目录，以及它自带的 node（`%USERPROFILE%\.workbuddy\binaries\node\`）；
-3. 调用 WorkBuddy 自带 CLI，把 MCP 服务 `trendradar` 注册进 `~/.codebuddy/mcp.json`；
+3. 调用 WorkBuddy 自带 CLI，把 MCP 服务 `trendradar` 注册进 `~/.codebuddy/mcp.json`（CLI 因 WorkBuddy 正在运行而不可用时，会自动改为直接写该文件，效果相同）；
 4. 把 `integrations/workbuddy-skill/trendradar/SKILL.md` 复制到 `~/.workbuddy/skills/trendradar/` 和 `~/.codebuddy/skills/trendradar/`。
 
 **执行完必须提醒用户：重启一次 WorkBuddy。** 这是整个流程里唯一需要人工的点击（MCP 连接只在启动时建立）。
+
+非交互执行（AI 助手自己跑）建议加 `-NoPause`，避免末尾等待回车：`install.cmd -NoPause`。
 
 macOS / Linux 上没有 WorkBuddy 时，等价动作是：
 
@@ -47,7 +49,7 @@ uv sync && .venv/bin/python -m trendradar --doctor
 .venv\Scripts\python.exe -m trendradar --doctor
 ```
 
-期望输出包含 `⚠️ AI配置: 未配置 AI API Key，AI 筛选/分析/翻译将自动跳过` 和 `❌ 0 项失败`。
+期望输出包含 `⚠️ AI配置: 未配置 AI API Key，AI 筛选/分析/翻译将自动跳过`、`✅ MCP注册: 已注册: ...` 和 `❌ 0 项失败`。
 `install.cmd` 末尾还会自动打印 MCP 健康检查，正常应为：
 
 ```
@@ -140,4 +142,7 @@ AI_API_KEY=local
 | 重启后 WorkBuddy 里仍看不到 trendradar | 再跑一次 `install.cmd` 看末尾健康检查；仍不 Connected 就把报错原文贴给用户 |
 | 抓取结果全空 | 平台接口偶发风控，过几分钟重试；确认能访问 weibo.com / zhihu.com |
 | 中文乱码 | 脚本已注入 `PYTHONIOENCODING=utf-8`；cmd 窗口先 `chcp 65001` |
+| 安装时出现 `EADDRINUSE 127.0.0.1:607xx` | 正常现象：WorkBuddy 正在运行，占用了内置 CLI 的本地端口。脚本会自动改为直写 `~/.codebuddy/mcp.json`，看到「已直写」即注册成功；也可以先退出 WorkBuddy 再装 |
+| `install.cmd` 停在最后不退出 | 末尾在等回车。非交互执行（AI 自己跑）请加 `-NoPause` |
+| 想知道 MCP 装没装上 | `--doctor` 看第 9 项 `MCP注册`：`已注册: ~/.codebuddy/mcp.json` 即正常 |
 | 端口 3333 被占用 | `python -m mcp_server.server --transport http --port 3334`，豆包 URL 同步改端口 |
