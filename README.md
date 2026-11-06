@@ -1,10 +1,12 @@
+> **给 AI 助手（WorkBuddy / Trae / Claude Code / Codex）**：本仓库自带一键安装说明，请直接读 [AGENTS.md](./AGENTS.md)，执行根目录的 `install.cmd` 即可，不要让用户手动配置或粘贴 JSON。
+
 <div align="center" id="trendradar">
 
 <a href="https://github.com/sansan0/TrendRadar" title="TrendRadar">
   <img src="/_image/banner.webp" alt="TrendRadar Banner" width="80%">
 </a>
 
-最快<strong>30秒</strong>部署的热点助手 —— 告别无效刷屏，只看真正关心的新闻资讯
+最快<strong>30秒</strong>部署的自托管热点助手 —— 聚合、研判、推送，再用一颗 <strong>3D 热点球</strong>看懂今天发生了什么
 
 <a href="https://trendradar.sandev.cc/zh/" title="TrendRadar 官方网站"><strong>🌐 官方网站</strong></a> · <a href="https://trendradar.sandev.cc/zh/docs/quick-start/" title="TrendRadar 官网文档"><strong>📖 官网文档</strong></a> · <a href="https://trendradar.sandev.cc/zh/docs/self-hosted-sources/" title="AI 自建热榜数据源"><strong>AI 自建热榜数据源</strong></a>
 
@@ -67,6 +69,37 @@
 | [🎯 **核心功能**](#-核心功能) | [💬 **社区交流**](#community) | [📚 **项目相关**](#-项目相关) |
 
 </div>
+
+<br>
+
+## 项目简介
+
+**ORBIT TrendRadar** 是一个自托管的热点聚合与研判工具：抓取全网热榜与 RSS，按关键词或 AI 兴趣模型筛选，做 AI 分析与选题研判，多通道推送，并渲染成可交互的 3D 热点球体看板。
+
+### 一次运行会做什么
+
+1. **采集** — 11 个热榜平台（今日头条、百度热搜、微博、抖音、知乎、Bilibili、贴吧、澎湃、凤凰网、财联社、华尔街见闻），外加自定义 RSS 订阅源
+2. **筛选** — 关键词规则模式（不调用 AI、零 token 消耗）或 AI 兴趣打分模式（按兴趣描述分类评分，支持增量重分类）
+3. **研判** — 热点趋势分析、多语言翻译、当日选题决策
+4. **推送** — 飞书 / 钉钉 / 企业微信 / Telegram / 邮件 / ntfy / Bark / Slack / 通用 Webhook，支持 `daily` 当日汇总、`current` 当前榜单、`incremental` 仅推新增三种模式
+5. **可视化** — 输出单文件自包含 HTML 报告：平台分组、RSS 时间流、AI 研判卡片，以及 ORBIT 3D 热点球
+
+### ORBIT 3D 看板
+
+- 粒子球按主题分区着色，热度越高对应球壳局部隆起越明显（脊线 + 丝束）
+- 左侧主题列表、中央球体、右侧报告卡片三栏联动，选中主题时镜头聚焦
+- 每次快照写入 24 小时热度记忆，球体上体现热度的累积与衰减
+- 无 WebGL 环境自动降级为 Canvas 2D；报告为单文件 HTML，双击即可打开
+
+### 部署方式
+
+| 方式 | 说明 |
+| --- | --- |
+| Docker | `docker compose -f docker/docker-compose.yml up -d --build`，配置参考 `docker/.env.example` |
+| 本地 Python | Python 3.12+，`uv sync` 后 `python -m trendradar` |
+| GitHub Actions | 免服务器定时运行，产物可发布到 Pages |
+
+> 本项目基于 [sansan0/TrendRadar](https://github.com/sansan0/TrendRadar)（GPL-3.0）二次开发，在其基础上重做了视觉层与 ORBIT 3D 交互。
 
 <br>
 

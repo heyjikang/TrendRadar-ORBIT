@@ -5,6 +5,7 @@ TrendRadar AI 模块
 提供 AI 大模型对热点新闻的深度分析和翻译功能
 """
 
+from .client import is_ai_available
 from .analyzer import AIAnalyzer, AIAnalysisResult
 from .filter import AIFilter, AIFilterResult
 from .filter_pipeline import AIFilterPipeline
@@ -19,6 +20,8 @@ from .formatter import (
 )
 
 __all__ = [
+    # 可用性检测
+    "is_ai_available",
     # 分析器
     "AIAnalyzer",
     "AIAnalysisResult",

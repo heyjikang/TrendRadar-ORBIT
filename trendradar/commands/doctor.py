@@ -142,18 +142,23 @@ def _check_with_config(results: List[Tuple[str, str, str]], config: Dict) -> Non
     ai_enabled = ai_analysis_enabled or ai_translation_enabled or ai_filter_enabled
 
     if ai_enabled:
-        try:
-            from trendradar.ai.client import AIClient
-            valid, message = AIClient(config.get("AI", {})).validate_config()
-            if valid:
-                _record_result(results, "pass", "AI配置", f"模型: {config.get('AI', {}).get('MODEL', '')}")
-            else:
-                if ai_analysis_enabled or ai_translation_enabled:
-                    _record_result(results, "fail", "AI配置", message)
+        from trendradar.ai.client import is_ai_available
+
+        if not is_ai_available(config.get("AI", {})):
+            _record_result(results, "warn", "AI配置", "未配置 AI API Key，AI 筛选/分析/翻译将自动跳过")
+        else:
+            try:
+                from trendradar.ai.client import AIClient
+                valid, message = AIClient(config.get("AI", {})).validate_config()
+                if valid:
+                    _record_result(results, "pass", "AI配置", f"模型: {config.get('AI', {}).get('MODEL', '')}")
                 else:
-                    _record_result(results, "warn", "AI配置", f"{message}（AI 筛选将回退关键词模式）")
-        except Exception as e:
-            _record_result(results, "fail", "AI配置", f"校验异常: {e}")
+                    if ai_analysis_enabled or ai_translation_enabled:
+                        _record_result(results, "fail", "AI配置", message)
+                    else:
+                        _record_result(results, "warn", "AI配置", f"{message}（AI 筛选将回退关键词模式）")
+            except Exception as e:
+                _record_result(results, "fail", "AI配置", f"校验异常: {e}")
     else:
         _record_result(results, "warn", "AI配置", "未启用 AI 功能，跳过校验")
 

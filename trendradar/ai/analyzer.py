@@ -146,7 +146,8 @@ class AIAnalyzer:
         if not self.client.api_key:
             return AIAnalysisResult(
                 success=False,
-                error="未配置 AI API Key，请在 config.yaml 或环境变量 AI_API_KEY 中设置"
+                skipped=True,
+                error="未配置 AI API Key，已自动跳过 AI 分析",
             )
 
         # 准备新闻内容并获取统计数据
@@ -269,6 +270,9 @@ class AIAnalyzer:
         不参与 6 字段 JSON 解析。仅用于飞书推送追加展示，失败或无内容时返回空串，
         不影响主分析流程。
         """
+        if not self.client.api_key:
+            return ""
+
         try:
             prompt_file = self.analysis_config.get(
                 "TOPIC_PROMPT_FILE", "ai_topic_prompt.txt"

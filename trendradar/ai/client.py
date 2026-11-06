@@ -14,6 +14,18 @@ import httpx
 from litellm import completion
 
 
+def is_ai_available(ai_config: Dict[str, Any]) -> bool:
+    """判断 AI 能力是否可用。
+
+    只要求 API Key 非空（本地 OpenAI 兼容服务如 vLLM 填任意非空值即可），
+    用于在未配置 Key 时提前关闭 AI 筛选 / AI 分析 / AI 翻译，避免无效请求和报错。
+    """
+    if not ai_config:
+        return False
+    key = ai_config.get("API_KEY") or os.environ.get("AI_API_KEY", "")
+    return bool(str(key).strip())
+
+
 class AIClient:
     """统一的 AI 客户端（基于 LiteLLM）"""
 

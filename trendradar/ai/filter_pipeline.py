@@ -8,6 +8,7 @@ AI 筛选流水线
 
 from typing import Any, Callable, Dict, List, Optional
 
+from trendradar.ai.client import is_ai_available
 from trendradar.ai.filter import AIFilter, AIFilterResult
 from trendradar.utils.time import (
     DEFAULT_TIMEZONE,
@@ -73,6 +74,9 @@ class AIFilterPipeline:
         6. 查询 active 结果，按标签分组返回
         """
         filter_config = self._filter_config
+
+        if not is_ai_available(self._ai_config):
+            return AIFilterResult(success=False, error="未配置 AI API Key")
 
         ai_filter = AIFilter(self._ai_config, filter_config, self.get_time, self._debug)
 
@@ -153,6 +157,13 @@ class AIFilterPipeline:
 
         # 7. 结束批量模式
         self.storage.end_batch()
+
+        # 全部批次失败（如网络/鉴权异常）时回退关键词，避免产出空报告
+        if total_pending > 0 and not succeeded_news_ids and not succeeded_rss_ids:
+            return AIFilterResult(
+                success=False,
+                error="AI 分类全部失败，已自动回退到关键词匹配",
+            )
 
         # 8. 查询并组装返回结果
         all_results = self.storage.get_active_ai_filter_results(interests_file=effective_interests_file)

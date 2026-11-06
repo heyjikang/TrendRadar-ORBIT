@@ -19,7 +19,7 @@ from trendradar.core.analyzer import convert_keyword_stats_to_platform_stats
 from trendradar.crawler import DataFetcher
 from trendradar.storage import convert_crawl_results_to_news_data
 from trendradar.utils.time import DEFAULT_TIMEZONE, is_within_days, calculate_days_old
-from trendradar.ai import AIAnalyzer, AIAnalysisResult
+from trendradar.ai import AIAnalyzer, AIAnalysisResult, is_ai_available
 from trendradar.core.scheduler import ResolvedSchedule
 from trendradar.commands import check_all_versions, run_doctor, run_test_notification, handle_status_commands
 from trendradar.commands.version import _fetch_remote_version, _parse_version
@@ -63,6 +63,14 @@ class NewsAnalyzer:
 
         # 创建应用上下文
         self.ctx = AppContext(config)
+
+        # AI 可用性：未配置 API Key 时自动关闭 AI 筛选 / AI 分析 / AI 翻译
+        self.ai_available = is_ai_available(self.ctx.config.get("AI", {}))
+        if not self.ai_available:
+            print(
+                "[AI] 未检测到 AI API Key（AI_API_KEY），"
+                "已自动跳过 AI 筛选 / AI 分析 / AI 翻译，其余功能不受影响"
+            )
 
         self.request_interval = self.ctx.config["REQUEST_INTERVAL"]
         self.report_mode = self.ctx.config["REPORT_MODE"]
@@ -316,6 +324,9 @@ class NewsAnalyzer:
         standalone_data: Optional[Dict] = None,
     ) -> Optional[AIAnalysisResult]:
         """执行 AI 分析"""
+        if not self.ai_available:
+            return None
+
         analysis_config = self.ctx.config.get("AI_ANALYSIS", {})
         if not analysis_config.get("ENABLED", False):
             return None
@@ -688,8 +699,12 @@ class NewsAnalyzer:
     ) -> Tuple[List[Dict], Optional[str], Optional[AIAnalysisResult], Optional[List[Dict]], Optional[Dict], Optional[List[Dict]]]:
         """统一的分析流水线：数据处理 → 统计计算（关键词/AI筛选）→ AI分析 → HTML生成"""
 
-        # 根据筛选策略选择数据处理方式
-        if self.filter_method == "ai":
+        # 根据筛选策略选择数据处理方式（无 AI Key 时自动降级为关键词匹配）
+        use_ai_filter = self.filter_method == "ai" and self.ai_available
+        if self.filter_method == "ai" and not self.ai_available:
+            print("[筛选] AI 筛选已禁用（未配置 AI API Key），本次使用关键词匹配")
+
+        if use_ai_filter:
             # === AI 筛选策略 ===
             print("[筛选] 使用 AI 智能筛选策略")
             ai_filter_result = self.ctx.run_ai_filter(interests_file=self.interests_file)

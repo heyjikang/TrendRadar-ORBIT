@@ -38,7 +38,7 @@ from trendradar.notification import (
     split_content_into_batches,
     NotificationDispatcher,
 )
-from trendradar.ai import AITranslator
+from trendradar.ai import AITranslator, is_ai_available
 from trendradar.ai.filter import AIFilterResult
 from trendradar.ai.filter_pipeline import AIFilterPipeline, _TagExtractionError
 from trendradar.storage import get_storage_manager
@@ -503,7 +503,10 @@ class AppContext:
         trans_config = self.config.get("AI_TRANSLATION", {})
         if trans_config.get("ENABLED", False):
             ai_config = self.config.get("AI", {})
-            translator = AITranslator(trans_config, ai_config)
+            if is_ai_available(ai_config):
+                translator = AITranslator(trans_config, ai_config)
+            else:
+                print("[翻译] 未配置 AI API Key，已自动跳过翻译")
 
         return NotificationDispatcher(
             config=self.config,
@@ -544,6 +547,13 @@ class AppContext:
         """执行 AI 智能筛选完整流程"""
         if not self.ai_filter_enabled:
             return None
+
+        if not is_ai_available(self.config.get("AI", {})):
+            return AIFilterResult(
+                success=False,
+                error="未配置 AI API Key，已自动回退到关键词匹配",
+            )
+
         try:
             return self._get_ai_filter_pipeline().run(interests_file)
         except _TagExtractionError:

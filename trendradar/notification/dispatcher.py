@@ -98,6 +98,10 @@ class NotificationDispatcher:
         if not self.translator or not self.translator.enabled:
             return report_data, rss_items, rss_new_items, standalone_data
 
+        if not getattr(self.translator.client, "api_key", ""):
+            print("[翻译] 未配置 AI API Key，已自动跳过翻译")
+            return report_data, rss_items, rss_new_items, standalone_data
+
         import copy
         print(f"[翻译] 开始翻译内容到 {self.translator.target_language}...")
 

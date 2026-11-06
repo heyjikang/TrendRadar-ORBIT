@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "trendradar": {
+      "type": "stdio",
+      "command": "d:\\self\\tendradar\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "mcp_server.server",
+        "--transport",
+        "stdio",
+        "--project-root",
+        "d:\\self\\tendradar"
+      ],
+      "env": {
+        "TZ": "Asia/Shanghai",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
