@@ -207,21 +207,28 @@ def _check_with_config(results: List[Tuple[str, str, str]], config: Dict) -> Non
 
 
 def _check_mcp_registration(results: List[Tuple[str, str, str]]) -> None:
+    # 客户端各读各的文件：WorkBuddy 读 ~/.workbuddy/mcp.json，codebuddy CLI 读 ~/.codebuddy/mcp.json。
+    # 只注册一侧时，另一侧的工具列表里完全看不到 trendradar，因此要分别报告。
     candidates = [
-        Path.home() / ".codebuddy" / "mcp.json",
-        Path.home() / ".workbuddy" / "mcp.json",
+        (Path.home() / ".workbuddy" / "mcp.json", "WorkBuddy"),
+        (Path.home() / ".codebuddy" / "mcp.json", "codebuddy CLI"),
     ]
     registered = []
-    for path in candidates:
+    missing = []
+    for path, label in candidates:
         if not path.exists():
+            missing.append(f"{label}({path})")
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8-sig"))
         except Exception:
+            missing.append(f"{label}({path} 解析失败)")
             continue
         entry = (data.get("mcpServers") or {}).get("trendradar")
         if entry:
             registered.append((path, entry))
+        else:
+            missing.append(f"{label}({path})")
 
     if not registered:
         _record_result(
@@ -233,6 +240,12 @@ def _check_mcp_registration(results: List[Tuple[str, str, str]]) -> None:
     broken = [str(p) for p, e in registered if not Path(e.get("command", "")).exists()]
     if broken:
         _record_result(results, "fail", "MCP注册", f"配置中的 command 不存在: {', '.join(broken)}")
+    elif missing:
+        paths = ", ".join(str(p) for p, _ in registered)
+        _record_result(
+            results, "warn", "MCP注册",
+            f"仅已注册: {paths}；未注册: {'; '.join(missing)}（该客户端看不到工具）"
+        )
     else:
         paths = ", ".join(str(p) for p, _ in registered)
         _record_result(results, "pass", "MCP注册", f"已注册: {paths}")

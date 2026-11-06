@@ -72,9 +72,16 @@ if (-not $Node) { throw "没找到 node。请先启动一次 WorkBuddy，或安�
 Step "2/4" "WorkBuddy: $WbRoot"
 
 # ---------- 3. 注册 MCP 服务 ----------
-$McpJson = Join-Path $env:USERPROFILE '.codebuddy\mcp.json'
+# WorkBuddy 客户端读 ~/.workbuddy/mcp.json，codebuddy CLI 读 ~/.codebuddy/mcp.json。
+# 两边都写：只写后者时 WorkBuddy 侧看不到 trendradar（工具列表里一个都没有）。
+$McpTargets = @(
+    (Join-Path $env:USERPROFILE '.workbuddy\mcp.json'),
+    (Join-Path $env:USERPROFILE '.codebuddy\mcp.json')
+)
+$McpJson = $McpTargets[0]
 
 function Write-McpConfig {
+    param([string]$McpJson)
     $dir = Split-Path $McpJson -Parent
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
 
@@ -136,13 +143,19 @@ if ($cliOk) {
     }
 }
 
+# 无论 CLI 是否成功都直写两份配置：
+# CLI 只会写 ~/.codebuddy/mcp.json，WorkBuddy 客户端读 ~/.workbuddy/mcp.json。
 if (-not $cliOk) {
-    try {
-        Write-McpConfig
-        Warn "已直写 $McpJson（与 CLI 注册等效）"
-    } catch {
+    Warn "改用直接写入配置文件。"
+}
+try {
+    foreach ($t in $McpTargets) { Write-McpConfig -McpJson $t }
+    Write-Host ("    已写入: " + ($McpTargets -join ' ; ')) -ForegroundColor DarkGray
+} catch {
+    if (-not $cliOk) {
         throw "MCP 注册失败：CLI 不可用，且写入 $McpJson 也失败：$_"
     }
+    throw "MCP 配置补写失败：$_"
 }
 Step "3/4" "已注册 MCP 服务 trendradar"
 
@@ -169,19 +182,23 @@ if ($cliOk) {
 } else {
     Write-Host "  (CLI 不可用，跳过 mcp list；已直写配置，重启 WorkBuddy 后生效)" -ForegroundColor DarkGray
 }
-if (Test-Path $McpJson) {
+foreach ($t in $McpTargets) {
+    if (-not (Test-Path $t)) {
+        Write-Host "  trendradar: 未写入 $t" -ForegroundColor Yellow
+        continue
+    }
     try {
-        $check = Get-Content $McpJson -Raw -Encoding UTF8 | ConvertFrom-Json
+        $check = Get-Content $t -Raw -Encoding UTF8 | ConvertFrom-Json
         $entry = $check.mcpServers.trendradar
         if ($entry) {
             $cmdOk = Test-Path $entry.command
             $icon = if ($cmdOk) { "OK" } else { "命令不存在" }
-            Write-Host "  trendradar: $($entry.type) -> $($entry.command)  [$icon]" -ForegroundColor $(if ($cmdOk) { 'Green' } else { 'Red' })
+            Write-Host "  trendradar: $t -> $($entry.type) $($entry.command)  [$icon]" -ForegroundColor $(if ($cmdOk) { 'Green' } else { 'Red' })
         } else {
-            Write-Host "  trendradar: 未在 $McpJson 中找到条目" -ForegroundColor Red
+            Write-Host "  trendradar: 未在 $t 中找到条目" -ForegroundColor Red
         }
     } catch {
-        Write-Host "  $McpJson 解析失败: $_" -ForegroundColor Red
+        Write-Host "  $t 解析失败: $_" -ForegroundColor Red
     }
 }
 

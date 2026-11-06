@@ -98,9 +98,10 @@ schtasks /Create /TN "TrendRadar-Daily" /TR "\"<仓库路径>\.venv\Scripts\pyth
 
 ## 5. 关于 AI Key
 
-`AI_API_KEY` 为空时：AI 筛选回退关键词、AI 分析跳过、AI 翻译跳过，其余全部正常。
+**AI 功能默认关闭**：`config/config.yaml` 里 `filter.method: keyword`、`ai_analysis.enabled: false`、`ai_translation.enabled: false`。也就是说开箱即用走的全是关键词匹配，不调用任何大模型。
+需要 AI 能力时，用户主动改这三处，再按下面配置 Key。
 
-想接本地 OpenAI 兼容服务，在 `.env` 里写：
+想接本地 OpenAI 兼容服务，用**系统环境变量**（不是 `.env`，本项目不读取 `.env` 文件）：
 
 ```
 AI_API_BASE=http://<IP>:<端口>/v1
@@ -108,6 +109,7 @@ AI_MODEL=<模型名>
 AI_API_KEY=local
 ```
 
+Windows 临时验证可在 PowerShell 里 `$env:AI_API_BASE="..."` 再运行；持久化用 `setx` 或写进 `run-trendradar.local.ps1`（已在 `.gitignore` 中）。
 环境变量优先级高于 `config/config.yaml` 的 `ai` 段。
 
 ---

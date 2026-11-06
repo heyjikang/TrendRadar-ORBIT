@@ -171,11 +171,12 @@ report:
 # 4.5 筛选策略
 # ===============================================================
 filter:
-  method: "ai"                          # 筛选方式（二选一）
+  method: "keyword"                     # 筛选方式（二选一）
                                        # keyword = 关键词匹配，不调用 AI，不消耗 token，但规则固定
                                        #           词组定义在 config/frequency_words.txt
                                        # ai = AI 智能分类，更灵活但每次运行消耗 token
                                        #      兴趣描述在 config/ai_interests.txt，需配合下方 ai_filter
+                                       # 默认 keyword：不配 AI Key 也能开箱即用；要用 AI 需自行改成 ai 并配置 ai.api_key
 
   priority_sort_enabled: true          # AI 模式标签排序（仅 method=ai 时生效）
                                        # true = 按兴趣描述中的定义顺序
@@ -424,8 +425,9 @@ ai:
 # 9. AI 分析功能（模型配置见上方 ai 段）
 # ===============================================================
 ai_analysis:
-  enabled: true                     # 是否启用 AI 分析（true=启用, false=关闭）—— 总开关
-                                    # 开启 schedule 后此项仍为总开关：false=永远不分析，true=由调度控制
+  enabled: false                    # 是否启用 AI 分析（true=启用, false=关闭）—— 总开关
+                                    # 默认关闭：不配 AI Key 也能开箱即用，抓取与报告不受影响
+                                    # 需要用 AI 分析时改为 true，并配置上方 ai 段（或环境变量 AI_API_BASE / AI_MODEL / AI_API_KEY）
 
   language: "Chinese"               # 分析报告语言（如 "English", "Korean", "法语"）
   prompt_file: "ai_analysis_prompt.txt"   # 提示词文件（相对于 config 目录）
